@@ -29,6 +29,7 @@ import javax.swing.JMenuBar; // 添加导入
 import javax.swing.JMenuItem; // 添加导入
 import javax.swing.JOptionPane; // 添加导入
 import javax.swing.JPanel;
+import javax.swing.KeyStroke;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -63,29 +64,16 @@ public class EasteduScantronApplication {
         // 创建自定义画布
         CustomCanvas canvas = new CustomCanvas();
 
- 
-
         // 添加重置按钮到JFrame
         frame.setLayout(new BorderLayout()); // 设置布局
         frame.add(canvas, BorderLayout.CENTER); // 将画布添加到中心
- 
 
         JMenuBar menuBar = new JMenuBar(); // 创建菜单栏
         JMenu fileMenu = new JMenu("文件"); // 创建文件菜单
-        JMenuItem resetItem = new JMenuItem("重置"); // 创建重置菜单项
-        JMenuItem loadItem = new JMenuItem("加载"); // 创建加载菜单项
-
-        resetItem.addActionListener(new ActionListener() { // 使用 ActionListener
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String name = JOptionPane.showInputDialog("输入保存名称:"); // 输入保存名称
-                if (name != null && !name.trim().isEmpty()) {
-                    saveCanvas((CustomCanvas) canvas); // 保存当前画布状态
-                    currentFileName = name + ".dat"; // 更新当前文件名
-                }
-
-            }
-        });
+        JMenuItem loadItem = new JMenuItem("打开..."); // 创建加载菜单项
+        // 添加新建功能到菜单
+        JMenuItem newMenuItem = new JMenuItem("新建...");
+        JMenuItem saveMenuItem = new JMenuItem("保存");
         loadItem.addActionListener(new ActionListener() { // 使用 ActionListener
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -97,78 +85,51 @@ public class EasteduScantronApplication {
                         fileNames.add(file.getName().replace(".dat", "")); // 去掉文件扩展名
                     }
                 }
-                
+
                 String name = (String) JOptionPane.showInputDialog(
-                    null,
-                    "选择加载名称:",
-                    "加载画布",
-                    JOptionPane.PLAIN_MESSAGE,
-                    null,
-                    fileNames.toArray(),
-                    fileNames.isEmpty() ? null : fileNames.get(0) // 默认选择第一个
+                        null,
+                        "选择加载名称:",
+                        "加载画布",
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        fileNames.toArray(),
+                        fileNames.isEmpty() ? null : fileNames.get(0) // 默认选择第一个
                 );
-    
+
                 if (name != null && !name.trim().isEmpty()) {
-                    loadCanvas((CustomCanvas) canvas, name); // 加载画布状态
+                    canvas.loadCanvas(name); // 加载画布状态
                 }
             }
         });
-
-        fileMenu.add(resetItem); // 将重置项添加到菜单
-        fileMenu.add(loadItem); // 将加载项添加到菜单
-        menuBar.add(fileMenu); // 将文件菜单添加到菜单栏
-        frame.setJMenuBar(menuBar); // 设置菜单栏
-
-        // 添加新建功能到菜单
-        JMenuItem newMenuItem = new JMenuItem("新建");
         newMenuItem.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 // 添加对外部类的引用
-                if (canvas.isCanvasSaved()) { // 检测画布是否已保存
-                    canvas.clearCanvas();
-                } else {
-                    saveCanvas(canvas); // 调用保存功能
+                if (!canvas.isCanvasSaved()) { // 检测画布是否已保存
+                    canvas.saveCanvas(); // 调用保存功能
                 }
+                canvas.clearCanvas();
+                currentFileName = null;
             }
         });
+        saveMenuItem.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                canvas.saveCanvas(); // 调用保存功能
+            }
+        });
+        // 添加快捷键 Ctrl+N
+        newMenuItem.setAccelerator(KeyStroke.getKeyStroke("ctrl N"));
+        // 添加快捷键 Ctrl+S
+        saveMenuItem.setAccelerator(KeyStroke.getKeyStroke("ctrl S"));
+        // 添加快捷键 Ctrl+O
+        loadItem.setAccelerator(KeyStroke.getKeyStroke("ctrl O"));
+
         fileMenu.add(newMenuItem); // 将菜单项添加到菜单
+        fileMenu.add(loadItem); // 将加载项添加到菜单
+        fileMenu.add(saveMenuItem); // 将保存项添加到菜单
+        menuBar.add(fileMenu); // 将文件菜单添加到菜单栏
+        frame.setJMenuBar(menuBar); // 设置菜单栏
 
         frame.setVisible(true);
-    }
-
- 
-    // 修改保存方法
-    private static void saveCanvas(CustomCanvas canvas) {
-        try {
-            if (currentFileName == null) { // 判断是否为新建文件
-                String name = JOptionPane.showInputDialog("输入保存名称:"); // 输入保存名称
-                if (name != null && !name.trim().isEmpty()) {
-                    currentFileName = name + ".dat"; // 更新当前文件名
-                } else {
-                    return; // 如果没有输入名称，则返回
-                }
-            }
-            try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(currentFileName))) {
-                oos.writeObject(canvas.shapes); // 保存图形列表
-                oos.writeObject(canvas.allDragPaths); // 保存拖动路径
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void loadCanvas(CustomCanvas canvas, String name) {
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(name + ".dat"))) {
-            @SuppressWarnings("unchecked")
-            List<Shape> shapes = (List<Shape>) ois.readObject(); // 读取图形列表
-            @SuppressWarnings("unchecked")
-            List<List<Point>> dragPaths = (List<List<Point>>) ois.readObject(); // 读取拖动路径
-            canvas.shapes = shapes; // 赋值
-            canvas.allDragPaths = dragPaths; // 赋值
-            canvas.repaint(); // 重新绘制画布
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
-        }
     }
 
     // 添加以下方法
@@ -197,14 +158,55 @@ public class EasteduScantronApplication {
         private ResizeHandle resizeHandle; // 添加这一行
 
         public boolean isCanvasSaved() {
-            // 返回画布是否���保存的逻辑
+            // 返回画布是否保存的逻辑
             return isCanvasSaved; // 示例返回值
+        }
+
+        public void setCanvasSaved(boolean isCanvasSaved) {
+            this.isCanvasSaved = isCanvasSaved;
+        }
+
+        public void loadCanvas(String name) {
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(name + ".dat"))) {
+                @SuppressWarnings("unchecked")
+                List<Shape> shapes = (List<Shape>) ois.readObject(); // 读取图形列表
+                @SuppressWarnings("unchecked")
+                List<List<Point>> dragPaths = (List<List<Point>>) ois.readObject(); // 读取拖动路径
+                this.shapes = shapes; // 赋值
+                this.allDragPaths = dragPaths; // 赋值
+                this.repaint(); // 重新绘制画布
+                setCanvasSaved(true);
+                currentFileName = name + ".dat";
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void saveCanvas() {
+            try {
+                if (currentFileName == null) { // 判断是否为新建文件
+                    String name = JOptionPane.showInputDialog("输入保存名称:"); // 输入保存名称
+                    if (name != null && !name.trim().isEmpty()) {
+                        currentFileName = name + ".dat"; // 更新当前文件名
+                    } else {
+                        return; // 如果没有输入名称，则返回
+                    }
+                }
+                try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(currentFileName))) {
+                    oos.writeObject(this.shapes); // 保存图形列表
+                    oos.writeObject(this.allDragPaths); // 保存拖动路径
+                    setCanvasSaved(true);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         public void clearCanvas() {
             this.shapes.clear();
             this.allDragPaths.clear();
             this.repaint();
+            setCanvasSaved(false);
         }
 
         {
@@ -233,7 +235,7 @@ public class EasteduScantronApplication {
                     dragStartX = e.getX(); // 添加这一行
                     dragStartY = e.getY(); // 添加这一行
                     repaint();
-                    isCanvasSaved = false;
+                    setCanvasSaved(false);
                 }
 
                 public void mouseReleased(MouseEvent e) {
@@ -245,7 +247,7 @@ public class EasteduScantronApplication {
                     isDragging = false;
                     dragPath.clear();
                     repaint();
-                    isCanvasSaved = false;
+                    setCanvasSaved(false);
                 }
             });
 
@@ -272,7 +274,7 @@ public class EasteduScantronApplication {
                     }
                     // 更新当前鼠标位置
                     currentMousePosition = e.getPoint();
-                    isCanvasSaved = false;
+                    setCanvasSaved(false);
                 }
             });
 
@@ -284,7 +286,7 @@ public class EasteduScantronApplication {
                             dragPath = new ArrayList<>();
                         }
                         dragPath.add(e.getPoint());
-                        isCanvasSaved = false;
+                        setCanvasSaved(false);
                     }
                     // 其他拖动逻辑...
                 }
@@ -313,7 +315,7 @@ public class EasteduScantronApplication {
                     }
                     // 更新当前鼠标位置
                     currentMousePosition = e.getPoint();
-                    isCanvasSaved = false;
+                    setCanvasSaved(false);
                 }
             });
 
@@ -329,7 +331,6 @@ public class EasteduScantronApplication {
                     } else {
                         setCursor(Cursor.getDefaultCursor());
                     }
-                    isCanvasSaved = false;
                 }
             });
         }
@@ -366,7 +367,7 @@ public class EasteduScantronApplication {
                 int width = Math.abs(rect.x - newPoint.x);
                 int height = Math.abs(rect.y - newPoint.y);
                 rect.setBounds(x, y, width, height);
-                this.isCanvasSaved = false;
+                setCanvasSaved(false);
             }
             // 对于其他形状类型，可以在这里添加相应的处理逻辑
         }
@@ -378,7 +379,7 @@ public class EasteduScantronApplication {
                 int dy = newPoint.y - startPoint.y;
                 rect.setLocation(rect.x + dx, rect.y + dy);
                 startPoint = newPoint;
-                this.isCanvasSaved = false;
+                setCanvasSaved(false);
             }
             // 对于其他形状类型，可以在这里添加相应的处理逻辑
         }
@@ -420,7 +421,7 @@ public class EasteduScantronApplication {
                 dragStartX = e.getX();
                 dragStartY = e.getY();
                 repaint();
-                this.isCanvasSaved = false;
+                setCanvasSaved(false);
             }
         }
 
