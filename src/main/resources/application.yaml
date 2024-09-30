@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: eastedu-scantron
+  mvc:
+    favicon:
+      enabled: false
+  thymeleaf:
+    cache: false
+  datasource:
+    url: jdbc:mysql://localhost:3306/eastedu?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
