@@ -8,16 +8,24 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Shape;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.io.*; // 添加导入
 import java.util.ArrayList;
+import java.util.HashMap; // 添加导入
 import java.util.List;
+import java.util.Map; // 添加导入
 
+import javax.swing.AbstractAction;
 import javax.swing.JButton; // 添加导入
+import javax.swing.JComponent;
 import javax.swing.JFrame;
+import javax.swing.JOptionPane; // 添加导入
 import javax.swing.JPanel;
+import javax.swing.KeyStroke; // 添加导入
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -40,6 +48,9 @@ public class EasteduScantronApplication {
         NORTHWEST, NORTHEAST, SOUTHWEST, SOUTHEAST
     }
 
+    private static Map<String, CustomCanvas> savedCanvases = new HashMap<>(); // 添加保存的画布映射
+    private static String currentFileName = null; // 修改为静态变量
+
     /**
      * 应用程序的入口点
      * 
@@ -57,7 +68,11 @@ public class EasteduScantronApplication {
         // 在创建JFrame的代码中添加重置按钮
         JButton resetButton = new JButton("重置");
         resetButton.addActionListener(e -> {
-            saveCanvas((CustomCanvas) canvas); // 保存当前画布状态
+            String name = JOptionPane.showInputDialog("输入保存名称:"); // 输入保存名称
+            if (name != null && !name.trim().isEmpty()) {
+                saveCanvas((CustomCanvas) canvas); // 保存当前画布状态
+                currentFileName = name + ".dat"; // 更新当前文件名
+            }
             ((CustomCanvas) canvas).shapes.clear(); // 清空所有图形
             ((CustomCanvas) canvas).allDragPaths.clear(); // 清空拖动路径
             canvas.repaint(); // 重新绘制画布
@@ -71,31 +86,99 @@ public class EasteduScantronApplication {
         // 添加加载按钮
         JButton loadButton = new JButton("加载");
         loadButton.addActionListener(e -> {
-            loadCanvas((CustomCanvas) canvas); // 加载画布状态
+            File folder = new File("."); // 当前目录
+            File[] files = folder.listFiles((dir, name) -> name.endsWith(".dat")); // 获取所有.dat文件
+            List<String> fileNames = new ArrayList<>();
+            if (files != null) {
+                for (File file : files) {
+                    fileNames.add(file.getName().replace(".dat", "")); // 去掉文件扩展名
+                }
+            }
+            
+            String name = (String) JOptionPane.showInputDialog(
+                null,
+                "选择加载名称:",
+                "加载画布",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                fileNames.toArray(),
+                fileNames.isEmpty() ? null : fileNames.get(0) // 默认选择第一个
+            );
+
+            if (name != null && !name.trim().isEmpty()) {
+                loadCanvas((CustomCanvas) canvas, name); // 加载画布状态
+            }
         });
 
         // 添加加载按钮到JFrame
         frame.add(loadButton, BorderLayout.SOUTH); // 将按钮添加到底部
 
+        // 在主窗口中添加快捷键
+        frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, KeyEvent.CTRL_DOWN_MASK), "save");
+        frame.getRootPane().getActionMap().put("save", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                saveCanvas((CustomCanvas) canvas); // 保存当前画布状态
+            }
+        });
+
+        frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_L, KeyEvent.CTRL_DOWN_MASK), "load");
+        frame.getRootPane().getActionMap().put("load", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                File folder = new File("."); // 当前目录
+                File[] files = folder.listFiles((dir, name) -> name.endsWith(".dat")); // 获取所有.dat文件
+                List<String> fileNames = new ArrayList<>();
+                if (files != null) {
+                    for (File file : files) {
+                        fileNames.add(file.getName().replace(".dat", "")); // 去掉文件扩展名
+                    }
+                }
+                
+                String name = (String) JOptionPane.showInputDialog(
+                    null,
+                    "选择加载名称:",
+                    "加载画布",
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    fileNames.toArray(),
+                    fileNames.isEmpty() ? null : fileNames.get(0) // 默认选择第一个
+                );
+
+                if (name != null && !name.trim().isEmpty()) {
+                    loadCanvas((CustomCanvas) canvas, name); // 加载画布状态
+                }
+            }
+        });
+
         frame.setVisible(true);
     }
 
-    // 添加保存和加载方法
+    // 修改保存方法
     private static void saveCanvas(CustomCanvas canvas) {
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("canvas.dat"))) {
-            oos.writeObject(canvas.shapes); // 保存图形列表
-            oos.writeObject(canvas.allDragPaths); // 保存拖动路径
+        try {
+            if (currentFileName == null) { // 判断是否为新建文件
+                String name = JOptionPane.showInputDialog("输入保存名称:"); // 输入保存名称
+                if (name != null && !name.trim().isEmpty()) {
+                    currentFileName = name + ".dat"; // 更新当前文件名
+                } else {
+                    return; // 如果没有输入名称，则返回
+                }
+            }
+            try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(currentFileName))) {
+                oos.writeObject(canvas.shapes); // 保存图形列表
+                oos.writeObject(canvas.allDragPaths); // 保存拖动路径
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static void loadCanvas(CustomCanvas canvas) {
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream("canvas.dat"))) {
-            // 使用类型安全的方式读取图形列表和拖动路径
-            @SuppressWarnings("unchecked") // 添加此行以抑制警告
+    private static void loadCanvas(CustomCanvas canvas, String name) {
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(name + ".dat"))) {
+            @SuppressWarnings("unchecked")
             List<Shape> shapes = (List<Shape>) ois.readObject(); // 读取图形列表
-            @SuppressWarnings("unchecked") // 添加此行以抑制警告
+            @SuppressWarnings("unchecked")
             List<List<Point>> dragPaths = (List<List<Point>>) ois.readObject(); // 读取拖动路径
             canvas.shapes = shapes; // 赋值
             canvas.allDragPaths = dragPaths; // 赋值
