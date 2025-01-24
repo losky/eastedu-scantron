@@ -6,17 +6,17 @@ import java.awt.Color;
 
 /**
  * The type Font style renderer.
+ * 
  * @author superman
  */
-public class FontStyleRenderer {
+public class FontStyleRender {
     /**
      * Apply style.
-     *
-     * @param g2d      the g 2 d
-     * @param style    the style
-     * @param baseFont the base font
+     * 
+     * @param g2d   the g 2 d
+     * @param style the style
      */
-    public void applyStyle(Graphics2D g2d, TextStyle style, Font baseFont) {
+    public void applyStyle(Graphics2D g2d, TextStyle style) {
         if (style != null) {
             // 设置字体样式
             int fontStyle = Font.PLAIN;
@@ -26,15 +26,11 @@ public class FontStyleRenderer {
             if (style.isItalic()) {
                 fontStyle |= Font.ITALIC;
             }
-            
+
             // 创建新字体
-            Font font = new Font(
-                style.getFontFamily() != null ? style.getFontFamily() : baseFont.getFamily(),
-                fontStyle,
-                style.getFontSize() != null ? style.getFontSize().intValue() : baseFont.getSize()
-            );
+            Font font = new Font( style.getFontFamily(), fontStyle, style.getFontSize());
             g2d.setFont(font);
-            
+
             // 应用颜色
             if (style.getColor() != null) {
                 g2d.setColor(style.getColor());
@@ -43,4 +39,4 @@ public class FontStyleRenderer {
             }
         }
     }
-} 
+}

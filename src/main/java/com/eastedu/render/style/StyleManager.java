@@ -9,5 +9,5 @@ import com.eastedu.render.style.decorator.CompositeDecoratorRender;
  */
 public class StyleManager {
     private final CompositeDecoratorRender underlineRender = new CompositeDecoratorRender();
-    private final FontStyleRenderer fontStyleRenderer = new FontStyleRenderer();
+    private final FontStyleRender fontStyleRenderer = new FontStyleRender();
 }
